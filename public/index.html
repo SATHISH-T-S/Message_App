@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Send Her a Note</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Manrope', sans-serif; }
+  .serif { font-family: 'Cormorant Garamond', serif; }
+
+  @keyframes sealClose {
+    0%   { transform: rotateX(0deg); }
+    100% { transform: rotateX(-180deg); }
+  }
+  @keyframes flyAway {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(-140px) rotate(-8deg); opacity: 0; }
+  }
+  .flap-closing { animation: sealClose 0.5s ease-in forwards; transform-origin: top; }
+  .envelope-flying { animation: flyAway 0.6s ease-in forwards; }
+</style>
+</head>
+<body class="bg-[#241628]">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+const GOLD = "#C9A15E";
+const CREAM = "#F3E9DA";
+
+function Envelope({ sending }) {
+  return (
+    <div className={`relative w-20 h-14 mx-auto ${sending ? "envelope-flying" : ""}`} style={{ perspective: "300px" }}>
+      <div className="absolute inset-0 rounded-sm" style={{ background: CREAM, border: `1px solid ${GOLD}` }}></div>
+      <div
+        className={`absolute left-0 top-0 w-full h-1/2 origin-top ${sending ? "flap-closing" : ""}`}
+        style={{
+          background: GOLD,
+          clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+        }}
+      ></div>
+    </div>
+  );
+}
+
+function App() {
+  const [herNumber, setHerNumber] = useState("+91");
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const canSend = herNumber.trim().length >= 8 && message.trim().length > 0 && status !== "sending";
+
+  async function handleSend() {
+    if (!canSend) return;
+    setStatus("sending");
+    setErrorMsg("");
+    try {
+      // This calls your own backend (see server.js), which talks to Twilio.
+      // The browser never sees your Twilio credentials.
+      const res = await fetch("/api/send-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: herNumber, body: message }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Message could not be sent.");
+      }
+
+      setStatus("sent");
+      setTimeout(() => {
+        setStatus("idle");
+        setMessage("");
+      }, 2200);
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(err.message || "Something went wrong.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6 py-16">
+      <div className="w-full max-w-sm">
+
+        <div className="text-center mb-10">
+          <p className="uppercase tracking-[0.3em] text-xs mb-3" style={{ color: GOLD }}>a note, sent</p>
+          <h1 className="serif text-4xl italic" style={{ color: CREAM }}>Send her something</h1>
+        </div>
+
+        <div className="rounded-2xl p-6 space-y-5" style={{ background: "#2E1B34", border: "1px solid #4A2F52" }}>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider mb-2" style={{ color: "#B79FC0" }}>
+              Her number
+            </label>
+            <input
+              type="tel"
+              value={herNumber}
+              onChange={(e) => setHerNumber(e.target.value)}
+              placeholder="+91XXXXXXXXXX"
+              className="w-full rounded-lg px-4 py-3 outline-none focus:ring-2 transition"
+              style={{ background: "#241628", color: CREAM, border: "1px solid #4A2F52" }}
+              onFocus={(e) => e.target.style.boxShadow = `0 0 0 2px ${GOLD}55`}
+              onBlur={(e) => e.target.style.boxShadow = "none"}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider mb-2" style={{ color: "#B79FC0" }}>
+              Your message
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Thinking of you..."
+              rows={4}
+              className="w-full rounded-lg px-4 py-3 outline-none resize-none transition"
+              style={{ background: "#241628", color: CREAM, border: "1px solid #4A2F52" }}
+              onFocus={(e) => e.target.style.boxShadow = `0 0 0 2px ${GOLD}55`}
+              onBlur={(e) => e.target.style.boxShadow = "none"}
+            />
+          </div>
+
+          <button
+            onClick={handleSend}
+            disabled={!canSend}
+            className="w-full rounded-lg py-3 font-semibold tracking-wide transition disabled:opacity-40"
+            style={{ background: GOLD, color: "#241628" }}
+          >
+            {status === "sending" ? "Sending…" : status === "sent" ? "Delivered" : "Send"}
+          </button>
+
+          {status !== "idle" && (
+            <div className="pt-2">
+              <Envelope sending={status === "sending"} />
+              {status === "sent" && (
+                <p className="text-center text-sm mt-3 serif italic" style={{ color: GOLD }}>
+                  It's on its way to her phone.
+                </p>
+              )}
+              {status === "error" && (
+                <p className="text-center text-sm mt-3" style={{ color: "#E2897A" }}>
+                  {errorMsg}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <p className="text-center text-xs mt-6" style={{ color: "#7A6482" }}>
+          Sent as a real text message — no app needed on her end.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
